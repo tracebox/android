@@ -1,0 +1,12 @@
+*.tar.gz
+*.swp
+arm-linux-androideabi-4.9
+json-c-*
+libnetfilter_queue-*
+libnfnetlink-*
+libpcap-*
+lua-*
+libbind-*
+usr/*
+bin/*
+share/*
