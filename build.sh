@@ -187,7 +187,7 @@ export CFLAGS="$CFLAGS -I$BASE_DIR/android-ifaddrs"
 export CXXFLAGS="$CXXFLAGS -I$BASE_DIR/android-ifaddrs"
 export LDFLAGS="$LDFLAGS -L$BASE_DIR/android-ifaddrs"
 cd tracebox
-#./bootstrap.sh
+./bootstrap.sh
 ./configure \
     --prefix=$BASE_DIR \
     --host=arm-linux \
