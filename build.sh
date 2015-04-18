@@ -58,8 +58,9 @@ export LD=arm-linux-androideabi-ld
 export STRIP=arm-linux-androideabi-strip
 export PATH=$PWD/$TOOLCHAIN/bin:$PATH
 
-export CFLAGS="-Os $CFLAGS"
-export CXXFLAGS="-Os $CXXFLAGS"
+export CFLAGS="-Os -fPIE $CFLAGS"
+export CXXFLAGS="-Os -fPIE $CXXFLAGS"
+export LDFLAGS="-fPIE -pie $LDFLAGS"
 # Build dependencies
 
 build_dep() {
@@ -107,7 +108,7 @@ LUA_build() {
     sed -i "s/CC= gcc/CC=$CC/" src/Makefile
     sed -i "s/AR= ar rcu/AR=$AR rcu/" src/Makefile
     sed -i "s/RANLIB= ranlib/RANLIB=$RANLIB/" src/Makefile
-    sed -i "s/O2/Os/" src/Makefile
+    sed -i "s/O2/Os -fPIE/" src/Makefile
     sed -i "s/#define LUA_USE_READLINE//g" src/luaconf.h
     make linux -j4
 }
@@ -173,13 +174,10 @@ export CFLAGS="$CFLAGS -I$BASE_DIR/$BIND-$BIND_VER/build/include/bind"
 export CXXFLAGS="$CXXFLAGS -I$BASE_DIR/$BIND-$BIND_VER/build/include/bind"
 export LDFLAGS="$LDFLAGS -L$BASE_DIR/$BIND-$BIND_VER/build/lib"
 
-git submodule init || 1
-git submodule update || 1
-
 # ifaddrs replacement
 cd android-ifaddrs
 echo "Building support lib for ifaddrs"
-$CC -c -Os -o ifaddrs.o ifaddrs.c
+$CC -c -Os -fPIE -o ifaddrs.o ifaddrs.c
 $AR rcs libifaddrs.a ifaddrs.o
 cd $BASE_DIR
 
