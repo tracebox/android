@@ -1,7 +1,10 @@
 #!/usr/bin/sh -e
+set -e
+trap "exit 1" SIGINT
 
 ANDROID_API=15
 TOOLCHAIN=arm-linux-androideabi-4.9
+
 
 ##
 ## Dep. versions
@@ -14,53 +17,60 @@ NFNL_VER=1.0.1
 NFQ_VER=1.0.2
 BIND_VER=6.0
 
+export CFLAGS_="-g -fPIE"
+export CFLAGS="$CFLAGS_ $CFLAGS"
+export CXXFLAGS="$CFLAGS_ $CXXFLAGS"
+export LDFLAGS="-fPIE -pie $LDFLAGS"
+
 ##
 ## This shouldn't need to be changed for a while ...
 ##
 
 BASE_DIR=$PWD
 
-# Find NDK
-if [ -z {$ANDROID_NDK} ]; then
-    ANDROID_NDK=/opt/android-ndk
-    echo "Setting ANDROID_NDK to a default value: $ANDROID_NDK"
-fi
-if [ -d ${ANDROID_NDK} ]; then
-    echo "Found Android NDK in $ANDROID_NDK"
-else
-    echo "$ANDROID_NDK does not appear to contain a NDK installation...Aborting."
-    exit 1
-fi
-
-# Export toolchain
-if [ -d ${TOOLCHAIN} ]; then
-    echo "Re-using existing Android NDK toolchain found in '$TOOLCHAIN'"
-else
-    echo "Creating Android NDK toolchain in '$TOOLCHAIN'"
-    mkdir ${TOOLCHAIN}
-    sh $ANDROID_NDK/build/tools/make-standalone-toolchain.sh \
-        --platform=android-$ANDROID_API \
-        --toolchain=${TOOLCHAIN} \
-        --install-dir=${TOOLCHAIN}
-    if [ $? -ne 0 ]; then
-	    echo "Failed to create the Android NDK Toolchain...Aborting."
-        rm -rf ${TOOLCHAIN}
-		exit 1
+check_ndk() {
+    # Find NDK
+    if [ -z {$ANDROID_NDK} ]; then
+        ANDROID_NDK=/opt/android-ndk
+        echo "Setting ANDROID_NDK to a default value: $ANDROID_NDK"
     fi
-fi
+    if [ -d ${ANDROID_NDK} ]; then
+        echo "Found Android NDK in $ANDROID_NDK"
+    else
+        echo "$ANDROID_NDK does not appear to contain a NDK installation...Aborting."
+        exit 1
+    fi
+}
 
-# Update env. var
-export CC=arm-linux-androideabi-gcc
-export CXX=arm-linux-androideabi-g++
-export RANLIB=arm-linux-androideabi-ranlib
-export AR=arm-linux-androideabi-ar
-export LD=arm-linux-androideabi-ld
-export STRIP=arm-linux-androideabi-strip
-export PATH=$PWD/$TOOLCHAIN/bin:$PATH
+check_toolchain() {
+    check_ndk
+    # Export toolchain
+    if [ -d ${TOOLCHAIN} ]; then
+        echo "Re-using existing Android NDK toolchain found in '$TOOLCHAIN'"
+    else
+        echo "Creating Android NDK toolchain in '$TOOLCHAIN'"
+        mkdir ${TOOLCHAIN}
+        sh $ANDROID_NDK/build/tools/make-standalone-toolchain.sh \
+            --platform=android-$ANDROID_API \
+            --toolchain=${TOOLCHAIN} \
+            --install-dir=${TOOLCHAIN}
+        if [ $? -ne 0 ]; then
+            echo "Failed to create the Android NDK Toolchain...Aborting."
+            rm -rf ${TOOLCHAIN}
+            exit 1
+        fi
+    fi
 
-export CFLAGS="-Os -fPIE $CFLAGS"
-export CXXFLAGS="-Os -fPIE $CXXFLAGS"
-export LDFLAGS="-fPIE -pie $LDFLAGS"
+    # Update env. var
+    export CC=arm-linux-androideabi-gcc
+    export CXX=arm-linux-androideabi-g++
+    export RANLIB=arm-linux-androideabi-ranlib
+    export AR=arm-linux-androideabi-ar
+    export LD=arm-linux-androideabi-ld
+    export STRIP=arm-linux-androideabi-strip
+    export PATH=$PWD/$TOOLCHAIN/bin:$PATH
+}
+
 # Build dependencies
 
 build_dep() {
@@ -108,7 +118,7 @@ LUA_build() {
     sed -i "s/CC= gcc/CC=$CC/" src/Makefile
     sed -i "s/AR= ar rcu/AR=$AR rcu/" src/Makefile
     sed -i "s/RANLIB= ranlib/RANLIB=$RANLIB/" src/Makefile
-    sed -i "s/O2/Os -fPIE/" src/Makefile
+    sed -i "s/-O2/${CFLAGS_}/" src/Makefile
     sed -i "s/#define LUA_USE_READLINE//g" src/luaconf.h
     make linux -j4
 }
@@ -159,6 +169,7 @@ BIND_build() {
     make -j4
     make install
     rm build/include/bind/arpa/inet.h
+    rm build/include/bind/netdb.h
 }
 
 mkdir -p usr/include/sys
@@ -166,34 +177,102 @@ echo "#include <sys/types.h>" > usr/include/sys/bitypes.h
 export CFLAGS="$CFLAGS -I$BASE_DIR/usr/include"
 export CXXFLAGS="$CXXFLAGS -I$BASE_DIR/usr/include"
 
-for dep in PCAP LUA JSON NFNL NFQ BIND; do
-    build_dep $dep
-done
+all_deps() {
+    for dep in PCAP LUA JSON NFNL NFQ BIND; do
+        build_dep $dep
+    done
+
+    # ifaddrs replacement
+    cd android-ifaddrs
+    echo "Building support lib for ifaddrs"
+    $CC -c $CFLAGS -o ifaddrs.o ifaddrs.c
+    $AR rcs libifaddrs.a ifaddrs.o
+    cd $BASE_DIR
+}
 
 export CFLAGS="$CFLAGS -I$BASE_DIR/$BIND-$BIND_VER/build/include/bind"
 export CXXFLAGS="$CXXFLAGS -I$BASE_DIR/$BIND-$BIND_VER/build/include/bind"
 export LDFLAGS="$LDFLAGS -L$BASE_DIR/$BIND-$BIND_VER/build/lib"
-
-# ifaddrs replacement
-cd android-ifaddrs
-echo "Building support lib for ifaddrs"
-$CC -c -Os -fPIE -o ifaddrs.o ifaddrs.c
-$AR rcs libifaddrs.a ifaddrs.o
-cd $BASE_DIR
-
 export CFLAGS="$CFLAGS -I$BASE_DIR/android-ifaddrs"
 export CXXFLAGS="$CXXFLAGS -I$BASE_DIR/android-ifaddrs"
 export LDFLAGS="$LDFLAGS -L$BASE_DIR/android-ifaddrs"
-cd tracebox
-./bootstrap.sh
-./configure \
-    --prefix=$BASE_DIR \
-    --host=arm-linux \
-    --disable-shared \
-    --enable-static \
-    --with-libpcap=$BASE_DIR/$PCAP-$PCAP_VER \
-    --with-lua=$BASE_DIR/$LUA-$LUA_VER/src \
-    --with-json=$BASE_DIR/$JSON-$JSON_VER \
-    --with-libs="$BASE_DIR/$BIND-$BIND_VER/build/lib/libbind.a $BASE_DIR/android-ifaddrs/libifaddrs.a $BASE_DIR/$JSON-$JSON_VER/lib/lib$JSON.a"
-make -j4
-make install-strip
+
+conf_tracebox() {
+    cd tracebox
+    ./bootstrap.sh
+    ./configure \
+        --prefix=$BASE_DIR \
+        --host=arm-linux \
+        --disable-shared \
+        --enable-static \
+        --with-libpcap=$BASE_DIR/$PCAP-$PCAP_VER \
+        --with-lua=$BASE_DIR/$LUA-$LUA_VER/src \
+        --with-json=$BASE_DIR/$JSON-$JSON_VER \
+        --with-libs="$BASE_DIR/$BIND-$BIND_VER/build/lib/libbind.a $BASE_DIR/android-ifaddrs/libifaddrs.a $BASE_DIR/$JSON-$JSON_VER/lib/lib$JSON.a"
+    cd $BASE_DIR
+}
+
+build_tracebox() {
+    cd tracebox
+    make -j4
+    make install #-strip
+    cd $BASE_DIR
+}
+
+deploy() {
+    adb push bin/tracebox /sdcard/tracebox
+}
+
+build_all() {
+    all_deps
+    conf_tracebox
+    build_tracebox
+    deploy
+}
+
+display_help() {
+    echo "Usage: $1"
+    echo "    -a     -- Build Tracebox, it's dependencies, and deploy to the pĥone"
+    echo "    -d     -- Build the dependencies"
+    echo "    -t     -- Build and deploy Tracebox"
+    echo "    -p     -- Deploy to the phone"
+    echo "    -h     -- Diplay this help message"
+    echo ""
+    echo "If no option is specified, defaults to -a."
+}
+
+check_toolchain
+if [ $# -eq 0 ] ; then
+    build_all
+else
+    while getopts ":htdap" opt; do
+        case $opt in
+            a)
+                build_all
+                ;;
+            d)
+                all_deps
+                ;;
+            t)
+                build_tracebox
+                deploy
+                ;;
+            h)
+                display_help $0
+                ;;
+            p)
+                deploy
+                ;;
+            \?)
+                echo "Invalid option: -$OPTARG" >&2
+                display_help $0
+                exit 1
+                ;;
+            :)
+                echo "Option -$OPTARG requires an argument." >&2
+                exit 1
+                ;;
+        esac
+    done
+fi
+exit 0
