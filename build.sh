@@ -205,7 +205,7 @@ conf_tracebox() {
         --host=arm-linux \
         --disable-shared \
         --enable-static \
-        --with-pcap-filename="/sdcard" \
+        --with-pcap-filename="/sdcard/capture.pcap" \
         --with-libpcap=$BASE_DIR/$PCAP-$PCAP_VER \
         --with-lua=$BASE_DIR/$LUA-$LUA_VER/src \
         --with-json=$BASE_DIR/$JSON-$JSON_VER \
