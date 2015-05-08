@@ -17,7 +17,7 @@ NFNL_VER=1.0.1
 NFQ_VER=1.0.2
 BIND_VER=6.0
 
-export CFLAGS_="-g -fPIE"
+export CFLAGS_="-O2 -fPIE"
 export CFLAGS="$CFLAGS_ $CFLAGS"
 export CXXFLAGS="$CFLAGS_ $CXXFLAGS"
 export LDFLAGS="-fPIE -pie $LDFLAGS"
@@ -205,6 +205,7 @@ conf_tracebox() {
         --host=arm-linux \
         --disable-shared \
         --enable-static \
+        --with-pcap-filename="/sdcard" \
         --with-libpcap=$BASE_DIR/$PCAP-$PCAP_VER \
         --with-lua=$BASE_DIR/$LUA-$LUA_VER/src \
         --with-json=$BASE_DIR/$JSON-$JSON_VER \
@@ -215,7 +216,7 @@ conf_tracebox() {
 build_tracebox() {
     cd tracebox
     make -j4
-    make install #-strip
+    make install-strip
     cd $BASE_DIR
 }
 
@@ -230,12 +231,18 @@ build_all() {
     deploy
 }
 
+cleanup() {
+    rm -rf json-c* libbind* libpcap* lua* share* usr* bin* libnfnetlink* libnetfilter_queue*
+    make -C tracebox clean
+}
+
 display_help() {
     echo "Usage: $1"
     echo "    -a     -- Build Tracebox, it's dependencies, and deploy to the pĥone"
     echo "    -d     -- Build the dependencies"
     echo "    -t     -- Build and deploy Tracebox"
     echo "    -p     -- Deploy to the phone"
+    echo "    -c     -- Cleanup"
     echo "    -h     -- Diplay this help message"
     echo ""
     echo "If no option is specified, defaults to -a."
@@ -245,7 +252,7 @@ check_toolchain
 if [ $# -eq 0 ] ; then
     build_all
 else
-    while getopts ":htdap" opt; do
+    while getopts ":htdapc" opt; do
         case $opt in
             a)
                 build_all
@@ -262,6 +269,9 @@ else
                 ;;
             p)
                 deploy
+                ;;
+            c)
+                cleanup
                 ;;
             \?)
                 echo "Invalid option: -$OPTARG" >&2
