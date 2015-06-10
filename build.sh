@@ -30,7 +30,7 @@ BASE_DIR=$PWD
 
 check_ndk() {
     # Find NDK
-    if [ -z {$ANDROID_NDK} ]; then
+    if [ -z ${ANDROID_NDK} ]; then
         ANDROID_NDK=/opt/android-ndk
         echo "Setting ANDROID_NDK to a default value: $ANDROID_NDK"
     fi
