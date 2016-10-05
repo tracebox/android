@@ -1,6 +1,6 @@
 *.tar.gz
 *.swp
-arm-linux-androideabi-4.9
+arm-linux-androideabi-*
 json-c-*
 libnetfilter_queue-*
 libnfnetlink-*

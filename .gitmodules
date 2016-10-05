@@ -3,4 +3,4 @@
 	url = https://github.com/tracebox/tracebox.git
 [submodule "android-ifaddrs"]
 	path = android-ifaddrs
-	url = https://github.com/kmackay/android-ifaddrs
+	url = https://github.com/oliviertilmans/android-ifaddrs
